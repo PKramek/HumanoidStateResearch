@@ -9,6 +9,8 @@ import numpy as np
 # According to this thread: https://github.com/openai/gym/issues/585
 # first 3 elements of the state vector are (X,Y,Z) coordinates
 
+# Description of Humanoid-v1 state vector, it supposedly was not changed
+# https://github.com/openai/gym/wiki/Humanoid-V1
 
 def get_plot_file_name(env_name: str, index: int) -> str:
     return f"{env_name}_state_vector_at_index_{index}"
@@ -78,7 +80,9 @@ if __name__ == '__main__':
     functions_and_titles = [
         (fi_one_over_x, "fi(x) = min(1/abs(1.4-x), 200)"),
         (fi_one_over_sqrt, "fi(x) = min(1/sqrt(pow((1.4-x) , 2)), 200)"),
-        (fi_normal_density, "fi(x) = normal(x, 1.4, 0.05), 200)")]
+        (fi_normal_density, "fi(x) = normal(x, 1.4, 0.05) * 1000"),
+        (fi_sum_of_normal_densities, "fi(x) = normal(x, 1.4, 0.05) + normal(x, 1.4, 0.001) * 1000")
+    ]
 
     for function, plot_title in functions_and_titles:
         test_fi_x = np.array(list(map(function, test_values_as_vectors)))
