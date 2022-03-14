@@ -54,13 +54,14 @@ if __name__ == '__main__':
     print(f"Length of observation: {len(observation)}")
     print(f"First observation: {observation}")
 
-    values = []
+    values = [observation[args.plot_index]]
 
-    for t in range(100):
+    for t in range(args.steps):
         print(f"Observation[plot_index]={observation[args.plot_index]}")
-        values.append(observation[args.plot_index])
+
         action = env.action_space.sample()
         observation, reward, done, info = env.step(action)
+        values.append(observation[args.plot_index])
         if done:
             print("Episode finished after {} timesteps".format(t + 1))
             break

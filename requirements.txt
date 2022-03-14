@@ -4,3 +4,4 @@ tensorflow==2.2.0
 tensorflow-probability==0.10.0
 numpy==1.17.3
 mujoco_py
+matplotlib
