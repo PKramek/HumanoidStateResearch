@@ -8,6 +8,7 @@ from util import calculate_shaped_reward
     [
         (0, 0, 0, 1.0, 0),
         (0.0, 500.0, 500.0, 0.99, -5.0),
+        (0.0, -500.0, -500.0, 0.99, 5.0)
     ])
 def test_eval(reward, fi_value, last_fi_value, gamma, expected):
     output = calculate_shaped_reward(

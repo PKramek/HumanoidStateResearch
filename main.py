@@ -3,14 +3,16 @@ from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import t
 
 # Description of Humanoid-v1 state vector, it supposedly was not changed
 # https://github.com/openai/gym/wiki/Humanoid-V1
-from util import normal_dist_density, plot_fi_x, calculate_shaped_reward
+from util import normal_dist_density, calculate_shaped_reward
 
 
 # According to this thread: https://github.com/openai/gym/issues/585
 # first 3 elements of the state vector are (X,Y,Z) coordinates
+
 
 def get_left_to_right_reward_values_in_reward_shaping(
         fi: Callable, input_x: np.ndarray,
@@ -140,8 +142,12 @@ def psi_less_narrow_penalty(x, middle_of_normal_dist: float = 1.4):
     return 55 * normal_dist_density(x[index], middle_of_normal_dist, 0.03) - 5.18
 
 
-def alive_penalty(x: np.ndarray):
+def alive_reward(x: np.ndarray):
     return 500.0
+
+
+def alive_penalty(x: np.ndarray):
+    return -500.0
 
 
 def abs_penalty(x: np.ndarray, optimal_point: float = 1.4):
@@ -196,6 +202,15 @@ def linear_penalty(state: np.ndarray, optimal_point: float = 1.4):
     return - (abs(state[index] - optimal_point)) * 100
 
 
+def t_student_penalty_df_0_2_scale_0_0_5(state: np.ndarray, optimal_point: float = 1.4):
+    index = 0
+    df = 0.2
+    scale = 0.05
+    loc = 1.4
+
+    return t.pdf(state[index], df=df, scale=scale, loc=loc)
+
+
 def plot_good_to_bad_states_reward_shaping_transition(fi: callable, step_size: float = 0.01, base_reward: float = 0.0,
                                                       gamma: float = 0.99):
     # TODO check this function
@@ -224,35 +239,60 @@ def plot_good_to_bad_states_reward_shaping_transition(fi: callable, step_size: f
     plt.show()
 
 
-def plot_bad_to_good_states_reward_shaping_transition(fi: callable, step_size: float = 0.01, base_reward: float = 0.0,
-                                                      gamma: float = 0.99):
-    # TODO check this function
-    right_to_left_input = np.arange(1.4, 1.6, step_size)
-    left_to_right_input = np.arange(1.2, 1.4, step_size)
+def plot_rewards_prim_from_beginning_to_fall(fi: callable, step_size: float = 0.01,
+                                             base_reward: float = 0.0, gamma: float = 0.99):
+    from_beginning_to_fall_range = np.arange(1.4, 1.2, -step_size)
+    rewards_prim = np.zeros_like(from_beginning_to_fall_range)
 
-    left_to_right_output, left_to_right_history = get_left_to_right_reward_values_in_reward_shaping(
-        fi=fi,
-        input_x=left_to_right_input,
-        gamma=gamma,
-        base_reward=base_reward
-    )
+    last_fi_value = fi([from_beginning_to_fall_range[0]])
 
-    right_to_left_output, right_to_left_history = get_right_to_left_reward_values_in_reward_shaping(
-        fi=fi,
-        input_x=right_to_left_input,
-        gamma=gamma,
-        base_reward=base_reward
-    )
+    rewards_prim[0] = calculate_shaped_reward(reward=base_reward, last_fi_value=last_fi_value,
+                                              fi_value=last_fi_value, gamma=gamma)
 
-    whole_input = np.concatenate((left_to_right_input, right_to_left_input))
-    whole_output = np.concatenate((left_to_right_output, right_to_left_output))
+    for i in range(1, len(from_beginning_to_fall_range)):
+        fi_value = fi([from_beginning_to_fall_range[i]])
 
-    plt.plot(whole_input, whole_output)
-    plt.title(f"{used_fi.__name__}: From bad to good states")
+        rewards_prim[i] = calculate_shaped_reward(reward=base_reward, last_fi_value=last_fi_value,
+                                                  fi_value=fi_value, gamma=gamma)
+
+    plt.plot(from_beginning_to_fall_range, rewards_prim)
+    plt.title(f"{fi.__name__}\nRewards prim from start of the episode till the fall")
+    plt.ylabel("Rewards prim when passing from consequent states")
+    plt.xlabel("State[0] (Mass center height)")
+    plt.grid()
     plt.show()
+
+    return from_beginning_to_fall_range, rewards_prim
+
+
+def plot_rewards_prim_from_fall_to_beginning(fi: callable, step_size: float = 0.01,
+                                             base_reward: float = 0.0, gamma: float = 0.99):
+    from_fall_to_beginning = np.arange(1.2, 1.4, step_size)
+    rewards_prim = np.zeros_like(from_fall_to_beginning)
+
+    last_fi_value = fi([from_fall_to_beginning[0]])
+
+    rewards_prim[0] = calculate_shaped_reward(reward=base_reward, last_fi_value=last_fi_value,
+                                              fi_value=last_fi_value, gamma=gamma)
+
+    for i in range(1, len(from_fall_to_beginning)):
+        fi_value = fi([from_fall_to_beginning[i]])
+
+        rewards_prim[i] = calculate_shaped_reward(reward=base_reward, last_fi_value=last_fi_value,
+                                                  fi_value=fi_value, gamma=gamma)
+
+    plt.plot(from_fall_to_beginning, rewards_prim)
+    plt.title(f"{fi.__name__}\nRewards prim from fall state to beginning point")
+    plt.ylabel("Rewards prim when passing from consequent states")
+    plt.xlabel("State[0] (Mass center height)")
+    plt.grid()
+    plt.show()
+
+    return from_fall_to_beginning, rewards_prim
 
 
 parser = argparse.ArgumentParser(description='Display information about state vector of gym environment')
+
 parser.add_argument('--env', type=str, help='Name of gym environment', required=True)
 parser.add_argument('--steps', type=int, help='Number of steps to perform in the environment', default=1000)
 parser.add_argument('--plot-index', type=int, help='Index of value in observation vector to create plot of', default=1)
@@ -261,31 +301,34 @@ parser.add_argument('--plot-path', type=str, help='Path to directory, where crea
 if __name__ == '__main__':
     # TODO - Where does this weird peak comes from (using flipped_best_psi) ??
 
-    test_array = np.arange(1.2, 1.4, 0.01)
-
-    test_range = list(range(len(test_array) - 1, -1, -1))
-    print(test_range)
-
-    for i in test_range:
-        print(test_array[i])
-
-    test_values = np.arange(1.2, 1.6, 0.0001)
-    test_values_as_vectors = list(map(lambda x: [x], test_values))
-
-
-    def fi_normal_big_differences(x: np.ndarray) -> float:
-        return normal_dist_density(x[0], 1.4, 0.1) * 300
-
-
-    used_fi = flipped_best_psi
+    used_fi = t_student_penalty_df_0_2_scale_0_0_5
     base_reward = 0.0
-    step_size = 0.001
+    step_size = 0.01
+    gamma = 0.99
 
-    plot_good_to_bad_states_reward_shaping_transition(fi=used_fi, step_size=step_size, base_reward=base_reward,
-                                                      gamma=0.95)
+    test_input = np.arange(1.2, 1.6, step_size)
+    output = np.zeros_like(test_input)
+    degrees_of_freedom = 0.2
+    middle_of_distribution = 1.4
+    scale = 0.05
 
-    plot_bad_to_good_states_reward_shaping_transition(fi=used_fi, step_size=step_size, base_reward=base_reward,
-                                                      gamma=0.95)
+    for i in range(len(test_input)):
+        output[i] = used_fi([test_input[i]])
+
+    plt.plot(test_input, output)
+    plt.title(f"{used_fi.__name__}")
+    plt.show()
+
+    plot_rewards_prim_from_beginning_to_fall(base_reward=base_reward, step_size=step_size,
+                                             fi=used_fi, gamma=gamma)
+    plot_rewards_prim_from_fall_to_beginning(base_reward=base_reward, step_size=step_size,
+                                             fi=used_fi, gamma=gamma)
+
+    # plot_good_to_bad_states_reward_shaping_transition(fi=used_fi, step_size=step_size, base_reward=base_reward,
+    #                                                   gamma=0.95)
+    #
+    # plot_bad_to_good_states_reward_shaping_transition(fi=used_fi, step_size=step_size, base_reward=base_reward,
+    #                                                   gamma=0.95)
 
     functions_and_titles = [
         (used_fi, f"{used_fi.__name__}"),
@@ -303,24 +346,6 @@ if __name__ == '__main__':
         # (abs_penalty, "ABS")
     ]
 
-    for function, plot_title in functions_and_titles:
-        test_fi_x = np.array(list(map(function, test_values_as_vectors)))
-        plot_fi_x(test_values, test_fi_x, plot_title)
-
-    # base_input = [1.4]
-    # step_from_optimal = [1.4 - 0.008]
-    # worse_input = [1.3]
-    # dead_input = [1.0]
-
-    # print(psi_less_narrow(base_input, 1.4))
-    # print_fi_x_summary(for_seminary, optimal_state=base_input, worse_state=worse_input)
-
-    # print(f"{right_to_left_output.__name__}")
-    # for line in right_to_left_output:
-    #     print(line)
-    #
-    # print("*" * 32)
-    #
-    # print(f"{left_to_right_history.__name__}")
-    # for line in left_to_right_history:
-    #     print(line)
+    # for function, plot_title in functions_and_titles:
+    #     test_fi_x = np.array(list(map(function, test_values_as_vectors)))
+    #     plot_fi_x(test_values, test_fi_x, plot_title)
