@@ -198,6 +198,7 @@ def linear_penalty(state: np.ndarray, optimal_point: float = 1.4):
 
 def plot_good_to_bad_states_reward_shaping_transition(fi: callable, step_size: float = 0.01, base_reward: float = 0.0,
                                                       gamma: float = 0.99):
+    # TODO check this function
     left_to_right_input = np.arange(1.4, 1.6, step_size)
     right_to_left_input = np.arange(1.2, 1.4, step_size)
 
@@ -215,41 +216,39 @@ def plot_good_to_bad_states_reward_shaping_transition(fi: callable, step_size: f
         base_reward=base_reward
     )
 
-    plt.plot(right_to_left_input, right_to_left_output)
-    plt.title(f"{used_fi.__name__}: From good to bad states - right to left")
-    plt.show()
+    whole_input = np.concatenate((right_to_left_input, left_to_right_input))
+    whole_output = np.concatenate((right_to_left_output, left_to_right_output))
 
-    plt.plot(left_to_right_input, left_to_right_output)
-    plt.title(f"{used_fi.__name__}: From good to bad states - left to right")
+    plt.plot(whole_input, whole_output)
+    plt.title(f"{used_fi.__name__}: From good to bad states")
     plt.show()
 
 
 def plot_bad_to_good_states_reward_shaping_transition(fi: callable, step_size: float = 0.01, base_reward: float = 0.0,
                                                       gamma: float = 0.99):
-    left_to_right_input = np.arange(1.4, 1.6, step_size)
-    right_to_left_input = np.arange(1.2, 1.4, step_size)
+    # TODO check this function
+    right_to_left_input = np.arange(1.4, 1.6, step_size)
+    left_to_right_input = np.arange(1.2, 1.4, step_size)
 
-    # to get bad to good we calculate function backwards
-    left_to_right_output, left_to_right_history = get_right_to_left_reward_values_in_reward_shaping(
+    left_to_right_output, left_to_right_history = get_left_to_right_reward_values_in_reward_shaping(
         fi=fi,
         input_x=left_to_right_input,
         gamma=gamma,
         base_reward=base_reward
     )
 
-    right_to_left_output, right_to_left_history = get_left_to_right_reward_values_in_reward_shaping(
+    right_to_left_output, right_to_left_history = get_right_to_left_reward_values_in_reward_shaping(
         fi=fi,
         input_x=right_to_left_input,
         gamma=gamma,
         base_reward=base_reward
     )
 
-    plt.plot(right_to_left_input, right_to_left_output)
-    plt.title(f"{used_fi.__name__}: From bad to good states - right to left")
-    plt.show()
+    whole_input = np.concatenate((left_to_right_input, right_to_left_input))
+    whole_output = np.concatenate((left_to_right_output, right_to_left_output))
 
-    plt.plot(left_to_right_input, left_to_right_output)
-    plt.title(f"{used_fi.__name__}: From from bad to good states - left to right")
+    plt.plot(whole_input, whole_output)
+    plt.title(f"{used_fi.__name__}: From bad to good states")
     plt.show()
 
 
@@ -260,6 +259,8 @@ parser.add_argument('--plot-index', type=int, help='Index of value in observatio
 parser.add_argument('--plot-path', type=str, help='Path to directory, where created plots will be created')
 
 if __name__ == '__main__':
+    # TODO - Where does this weird peak comes from (using flipped_best_psi) ??
+
     test_array = np.arange(1.2, 1.4, 0.01)
 
     test_range = list(range(len(test_array) - 1, -1, -1))
@@ -276,7 +277,7 @@ if __name__ == '__main__':
         return normal_dist_density(x[0], 1.4, 0.1) * 300
 
 
-    used_fi = best_psi_shifted_down
+    used_fi = flipped_best_psi
     base_reward = 0.0
     step_size = 0.001
 
